@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -8,9 +8,18 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const refFromUrl = searchParams.get('ref');
+    if (refFromUrl) {
+      setReferralCode(refFromUrl);
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -21,7 +30,7 @@ export default function Signup() {
 
     try {
       setLoading(true);
-      await signup(email, password, displayName);
+      await signup(email, password, displayName, referralCode);
       toast.success('Account created successfully!');
       navigate('/');
     } catch (error) {
@@ -108,6 +117,28 @@ export default function Signup() {
                   className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-3"
                 />
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="referralCode" className="block text-sm font-medium leading-6 text-gray-900">
+                Referral Code <span className="text-gray-500 font-normal">(Optional)</span>
+              </label>
+              <div className="mt-2">
+                <input
+                  id="referralCode"
+                  name="referralCode"
+                  type="text"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value)}
+                  placeholder="Enter referral code to earn bonus coins"
+                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-3"
+                />
+              </div>
+              {referralCode && (
+                <p className="mt-1 text-xs text-gray-500">
+                  💰 You'll both get 200 coins when you post your first item!
+                </p>
+              )}
             </div>
 
             <div>

@@ -1,118 +1,222 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import supabase from '../config/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { FaCoins, FaCheckCircle, FaArrowRight, FaUser, FaStore } from 'react-icons/fa';
 
 export default function Trades() {
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
   const { currentUser } = useAuth();
 
   useEffect(() => {
-    const load = async () => {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .contains('participants', [currentUser.id])
-        .order('created_at', { ascending: false });
-      if (!error) setTrades(data || []);
-      setLoading(false);
-    };
-    load();
-  }, [currentUser.id]);
+    if (!currentUser) return;
 
-  const getTradeStatusClass = (status) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    const loadTrades = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setTrades(data || []);
+      } catch (error) {
+        console.error('Error loading trades:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTrades();
+
+    const channel = supabase
+      .channel('trades-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'transactions',
+          filter: `buyer_id=eq.${currentUser.id}`,
+        },
+        (payload) => {
+          setTrades((prev) => [payload.new, ...prev]);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'transactions',
+          filter: `seller_id=eq.${currentUser.id}`,
+        },
+        (payload) => {
+          setTrades((prev) => [payload.new, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser]);
+
+  const filteredTrades = trades.filter((trade) => {
+    if (filter === 'all') return true;
+    if (filter === 'bought') return trade.buyer_id === currentUser?.id;
+    if (filter === 'sold') return trade.seller_id === currentUser?.id;
+    return trade.status === filter;
+  });
+
+  const getTradeRole = (trade) => {
+    if (trade.buyer_id === currentUser?.id) return 'buyer';
+    if (trade.seller_id === currentUser?.id) return 'seller';
+    return null;
+  };
+
+  const getStatusBadge = (status) => {
+    const styles = {
+      completed: 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-400 ring-1 ring-green-500/30',
+      pending: 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 text-yellow-400 ring-1 ring-yellow-500/30',
+      cancelled: 'bg-gradient-to-r from-red-500/20 to-rose-500/20 text-red-400 ring-1 ring-red-500/30',
+    };
+    return styles[status] || styles.completed;
   };
 
   if (loading) {
     return (
-      <div className="text-center">
+      <div className="text-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading trades...</p>
+        <p className="mt-4 text-gray-300">Loading trades...</p>
       </div>
     );
   }
 
   return (
     <div className="text-white">
-      <h1 className="text-2xl font-bold mb-6">My Trades</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <h1 className="text-2xl font-bold">Trade History</h1>
+        <div className="flex gap-2">
+          {['all', 'bought', 'sold'].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                filter === f
+                  ? 'bg-indigo-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]'
+                  : 'bg-gray-800/60 text-gray-300 hover:bg-gray-700/60'
+              }`}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {trades.length === 0 ? (
+      {filteredTrades.length === 0 ? (
         <div className="text-center py-12 rounded-lg bg-gray-900/70 ring-1 ring-white/10">
+          <FaCoins className="w-12 h-12 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-300">No trades found.</p>
           <p className="text-sm text-gray-400 mt-2">
-            Your trade history will appear here once you start trading.
+            {filter === 'all'
+              ? 'Your trade history will appear here once you start trading.'
+              : `No ${filter} trades found.`}
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {trades.map((trade) => (
-            <div key={trade.id} className="rounded-lg bg-gray-800/60 backdrop-blur ring-1 ring-white/10 p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-semibold text-white">
-                    Trade #{trade.id.slice(-8)}
-                  </h3>
-                  <p className="text-sm text-gray-400 mt-1">
-                    {new Date(trade.created_at).toLocaleString()}
-                  </p>
-                </div>
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-semibold ${getTradeStatusClass(
-                    trade.status
-                  )}`}
+          <AnimatePresence>
+            {filteredTrades.map((trade) => {
+              const role = getTradeRole(trade);
+              const isBuyer = role === 'buyer';
+              const isSeller = role === 'seller';
+
+              return (
+                <motion.div
+                  key={trade.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="rounded-lg bg-gray-800/60 backdrop-blur ring-1 ring-white/10 p-6 hover:ring-indigo-500/30 transition-all"
                 >
-                  {trade.status}
-                </span>
-              </div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          isBuyer
+                            ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 ring-1 ring-indigo-500/30'
+                            : 'bg-gradient-to-br from-green-500/20 to-emerald-500/20 ring-1 ring-green-500/30'
+                        }`}
+                      >
+                        {isBuyer ? (
+                          <FaUser className="w-6 h-6 text-indigo-400" />
+                        ) : (
+                          <FaStore className="w-6 h-6 text-green-400" />
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">{trade.item_title}</h3>
+                        <p className="text-sm text-gray-400">
+                          {new Date(trade.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(trade.status)}`}>
+                      {trade.status}
+                    </span>
+                  </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400">Item</h4>
-                  <p className="mt-1 font-semibold text-white">{trade.item_title}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400">Price</h4>
-                  <p className="mt-1 font-semibold text-indigo-400">{trade.price} coins</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400">Seller</h4>
-                  <p className="mt-1 text-white">{trade.seller_name}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400">Buyer</h4>
-                  <p className="mt-1 text-white">{trade.buyer_name}</p>
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div className="bg-gray-900/50 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                          {isBuyer ? 'You Paid' : 'You Received'}
+                        </span>
+                        <FaCoins className="w-4 h-4 text-yellow-400" />
+                      </div>
+                      <p className={`text-2xl font-bold ${isBuyer ? 'text-red-400' : 'text-green-400'}`}>
+                        {isBuyer ? '-' : '+'}
+                        {trade.price} coins
+                      </p>
+                    </div>
 
-              {trade.status === 'pending' && (
-                <div className="mt-6 flex justify-end space-x-4">
-                  <button
-                    onClick={() => toast('Coming soon!')}
-                    className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    Complete Trade
-                  </button>
-                  <button
-                    onClick={() => toast('Coming soon!')}
-                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    Cancel Trade
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+                    <div className="bg-gray-900/50 rounded-lg p-4">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-2">
+                        {isBuyer ? 'Seller' : 'Buyer'}
+                      </span>
+                      <p className="text-white font-semibold">
+                        {isBuyer ? trade.seller_name : trade.buyer_name}
+                      </p>
+                    </div>
+                  </div>
+
+                  {isSeller && (
+                    <div className="flex items-center gap-2 text-sm text-gray-400 bg-gray-900/30 rounded-lg p-3">
+                      <FaCheckCircle className="w-4 h-4 text-green-400" />
+                      <span>You received {trade.price} coins for this sale</span>
+                    </div>
+                  )}
+
+                  {isBuyer && (
+                    <div className="flex items-center gap-2 text-sm text-gray-400 bg-gray-900/30 rounded-lg p-3">
+                      <FaArrowRight className="w-4 h-4 text-indigo-400" />
+                      <span>You purchased this item for {trade.price} coins</span>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
     </div>

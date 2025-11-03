@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import supabase from '../config/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import PurchaseButton from '../components/PurchaseButton';
+import ChatWindow from '../components/ChatWindow';
+import { FaComments } from 'react-icons/fa';
 
 export default function Marketplace() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
+  const [openChatId, setOpenChatId] = useState(null);
   const { currentUser, getUserData } = useAuth();
 
   useEffect(() => {
@@ -100,9 +104,9 @@ export default function Marketplace() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {items.map((item) => (
             <div key={item.id} className="rounded-lg bg-gray-800/60 backdrop-blur ring-1 ring-white/10 overflow-hidden">
-              {item.imageUrl && (
+              {item.image_url && (
                 <img
-                  src={item.imageUrl}
+                  src={item.image_url}
                   alt={item.title}
                   className="w-full h-48 object-cover"
                 />
@@ -112,12 +116,21 @@ export default function Marketplace() {
                 <p className="text-sm text-gray-300 mt-1">{item.description}</p>
                 <div className="mt-4 flex justify-between items-center">
                   <span className="text-indigo-400 font-semibold">{item.price} coins</span>
-                  <PurchaseButton 
-                    itemId={item.id} 
-                    sellerId={item.ownerId} 
-                    price={item.price}
-                    onSuccess={handlePurchaseSuccess}
-                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setOpenChatId(item.owner_id)}
+                      className="p-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors border border-white/10"
+                      title="Chat with seller"
+                    >
+                      <FaComments className="w-4 h-4" />
+                    </button>
+                    <PurchaseButton 
+                      itemId={item.id} 
+                      sellerId={item.owner_id} 
+                      price={item.price}
+                      onSuccess={handlePurchaseSuccess}
+                    />
+                  </div>
                 </div>
                 <div className="mt-2 text-sm text-gray-300">
                   Listed by: {item.seller_name}
@@ -127,6 +140,28 @@ export default function Marketplace() {
           ))}
         </div>
       )}
+
+      <AnimatePresence>
+        {openChatId && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={(e) => e.target === e.currentTarget && setOpenChatId(null)}
+          >
+            <motion.div
+              className="w-full h-full max-w-4xl max-h-[90vh] bg-gray-900 rounded-lg overflow-hidden shadow-2xl"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ChatWindow otherUserId={openChatId} onClose={() => setOpenChatId(null)} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

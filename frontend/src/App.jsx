@@ -6,6 +6,8 @@ import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 import PageTransition from './components/PageTransition';
 import SplashScreen from './components/SplashScreen';
+import FloatingMessagesButton from './components/MessagesList';
+import OnboardingModal from './components/OnboardingModal';
 
 // Pages
 import Login from './pages/Login';
@@ -15,6 +17,7 @@ import Marketplace from './pages/Marketplace';
 import MyItems from './pages/MyItems';
 import Trades from './pages/Trades';
 import Profile from './pages/Profile';
+import ReferralPage from './pages/ReferralPage';
 
 function PrivateRoute({ children }) {
   const { currentUser } = useAuth();
@@ -73,9 +76,19 @@ function App() {
                   </PrivateRoute>
                 }
               />
+              <Route
+                path="/referral"
+                element={
+                  <PrivateRoute>
+                    <ReferralPage />
+                  </PrivateRoute>
+                }
+              />
             </Routes>
             </PageTransition>
           </main>
+          <FloatingMessagesButton />
+          <OnboardingModal />
         </div>
         <Toaster />
       </AuthProvider>

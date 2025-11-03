@@ -11,11 +11,16 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  async function signup(email, password, displayName) {
+  async function signup(email, password, displayName, referralCode = null) {
+    const userMetadata = { display_name: displayName };
+    if (referralCode) {
+      userMetadata.referral_code = referralCode;
+    }
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { display_name: displayName } }
+      options: { data: userMetadata }
     });
     if (error) throw error;
     // If email confirmations are enabled, data.session may be null here.
