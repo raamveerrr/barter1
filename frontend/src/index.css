@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Animated gradient background helper (optional) */
+@keyframes glowPulse {
+  0% { box-shadow: 0 0 0 rgba(99,102,241,0.0); }
+  50% { box-shadow: 0 0 24px rgba(99,102,241,0.35); }
+  100% { box-shadow: 0 0 0 rgba(99,102,241,0.0); }
+}
+
+.glow-indigo {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* 3D coin flip */
+@keyframes coinFlip {
+  0% { transform: rotateY(0deg); }
+  50% { transform: rotateY(180deg); }
+  100% { transform: rotateY(360deg); }
+}
+
+.animate-coin-flip {
+  animation: coinFlip 1.2s ease-in-out infinite;
+}

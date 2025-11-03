@@ -1,0 +1,20 @@
+﻿# Node
+**/node_modules/
+**/dist/
+**/.turbo/
+**/.next/
+**/.cache/
+
+# Env and local config
+*.env
+*.env.*.local
+frontend/.env.local
+
+# Logs
+**/npm-debug.log*
+**/yarn-error.log*
+
+# Firebase creds and exports
+firebase-credentials/
+firestore-debug.log
+test-data/

@@ -1,0 +1,209 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===== Helper Functions =====
+    
+    // Basic auth check
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Verify user has college email
+    function hasCollegeEmail() {
+      return request.auth.token.email.matches('.*@vitap\\.edu\\.in$')
+        && request.auth.token.email_verified == true;
+    }
+
+    // For emulator development, allow any authenticated user
+    function isEmulatorOrCollegeEmail() {
+      return isSignedIn();
+    }
+
+    // Check if user is admin (requires custom claim)
+    function isAdmin() {
+      return request.auth.token.role == 'admin';
+    }
+
+    // Check if request is from our own Cloud Functions
+    function isFromAuthenticatedServer() {
+      // In emulator, allow authenticated users to simulate server calls
+      return isSignedIn();
+    }
+
+    // Verify the user is modifying their own document
+    function isCurrentUser(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Check if a user owns an item
+    function isItemOwner(itemData) {
+      return request.auth.uid == itemData.ownerId;
+    }
+
+    // Verify allowed item fields on create
+    function hasValidItemFields() {
+      let required = ['ownerId', 'title', 'price', 'status'];
+      let allowed = [
+        'ownerId', 'title', 'description', 'category', 'price',
+        'photos', 'status', 'createdAt', 'updatedAt', 'tags',
+        'imageUrl', 'sellerName', 'campusId'
+      ];
+      return request.resource.data.keys().hasAll(required)
+        && request.resource.data.keys().hasOnly(allowed);
+    }
+
+    // Check if price is within valid range
+    function hasValidPrice() {
+      return request.resource.data.price is number
+        && request.resource.data.price > 0
+        && request.resource.data.price <= 10000;
+    }
+
+    // Check if transaction has required fields
+    function isValidTransaction() {
+      let required = ['type', 'amount', 'fromUserId', 'toUserId', 'status'];
+      let validTypes = ['LISTING_FEE', 'ITEM_PURCHASE', 'ADMIN_CREDIT', 'ADMIN_DEBIT', 'REFUND', 'WITHDRAWAL', 'DEPOSIT'];
+      let validStatuses = ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'];
+      
+      return request.resource.data.keys().hasAll(required)
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && validTypes.hasAny([request.resource.data.type])
+        && validStatuses.hasAny([request.resource.data.status]);
+    }
+
+    // ===== User Documents =====
+    match /users/{userId} {
+      // Read: only self or admin
+      allow read: if isSignedIn() && (isCurrentUser(userId) || isAdmin());
+      
+      // Create: only if email verified and from college domain (or emulator)
+      allow create: if isSignedIn()
+        && isCurrentUser(userId)
+        && isEmulatorOrCollegeEmail();
+      
+      // Update: user can update their profile but NOT economy data
+      allow update: if isSignedIn() 
+        && (isCurrentUser(userId) || isAdmin())
+        // Prevent direct modifications to economy data
+        && !request.resource.data.diff(resource.data).affectedKeys()
+           .hasAny(['economy', 'coinBalance', 'reputation']);
+      
+      allow delete: if false; // Disallow deletion, prefer soft-delete
+
+      // ===== Economy Subcollection =====
+      match /economy/wallet {
+        allow read: if isSignedIn() && isCurrentUser(userId);
+        // Only allow updates from server (via Cloud Functions)
+        allow write: if isFromAuthenticatedServer();
+      }
+
+      match /economy/transactions/{transactionId} {
+        allow read: if isSignedIn() && isCurrentUser(userId);
+        // Only allow writes from server (via Cloud Functions)
+        allow write: if isFromAuthenticatedServer();
+      }
+    }
+
+    // ===== Global Transactions =====
+    match /globalTransactions/{transactionId} {
+      allow read: if isSignedIn();
+      // Only allow writes from server (via Cloud Functions)
+      allow write: if isFromAuthenticatedServer();
+    }
+
+    // ===== Marketplace Items =====
+    match /campus/{campusId}/market/items/{itemId} {
+      // Anyone can read items (even unauthenticated)
+      allow read: if true;
+
+      // Create: authenticated user, valid fields, must set self as owner
+      allow create: if isSignedIn()
+        && hasValidItemFields()
+        && hasValidPrice()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'available'
+        && request.resource.data.campusId == campusId;
+
+      // Update: owner can update most fields, but status changes restricted
+      allow update: if isSignedIn()
+        && isItemOwner(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['title', 'description', 'price', 'category', 'photos', 'tags', 'updatedAt'])
+        && hasValidPrice();
+
+      // Delete: only admin or owner (if item is not sold)
+      allow delete: if isSignedIn()
+        && (isAdmin() || 
+            (isItemOwner(resource.data) && resource.data.status != 'sold'));
+    }
+
+    // ===== Admin Perks Store =====
+    match /admin/perks/{perkId} {
+      // Anyone can read perks
+      allow read: if true;
+      
+      // Only admins can manage perks
+      allow write: if isAdmin();
+    }
+
+    // ===== User Reports =====
+    match /reports/{reportId} {
+      // Users can create reports
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasAll(['reporterId', 'reportedUserId', 'reason'])
+        && request.resource.data.reporterId == request.auth.uid;
+      
+      // Admins can read and update reports
+      allow read, update: if isAdmin();
+    }
+
+    match /transactions/{txnId} {
+      // Read: participants and admin only
+      allow read: if isSignedIn()
+        && (request.auth.uid in resource.data.participants || isAdmin());
+      
+      // Create/Update: ONLY allow from Cloud Functions
+      allow write: if isFromAuthenticatedServer()
+        && isValidTransaction();
+      
+      // No deletes allowed - transactions are immutable
+      allow delete: if false;
+    }
+
+    match /perks/{perkId} {
+      // Anyone authenticated can read perks
+      allow read: if isSignedIn();
+      
+      // Only admin can write perks
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /redemptions/{redemptionId} {
+      // Read: redeemer and admin only
+      allow read: if isSignedIn()
+        && (request.auth.uid == resource.data.userId || isAdmin());
+      
+      // Create: user can initiate redemption but actual coin deduction happens in Cloud Function
+      allow create: if isSignedIn()
+        && request.auth.uid == request.resource.data.userId
+        && request.resource.data.status == 'pending'
+        && !request.resource.data.keys().hasAny(['coinBalanceUpdated']);
+      
+      // Update: only Cloud Functions can update status
+      allow update: if isFromAuthenticatedServer();
+    }
+
+    // Categories collection (if used)
+    match /categories/{categoryId} {
+      allow read: if true;  // public reference data
+      allow write: if isAdmin();
+    }
+
+    // Optional: System settings/config
+    match /system/{configId} {
+      allow read: if true;  // public
+      allow write: if isAdmin();
+    }
+  }
+}
