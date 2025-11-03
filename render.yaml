@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: barter-backend
+    env: node
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: node server.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      # Add any backend secrets here via Render dashboard as well
+      # - key: SOME_API_KEY
+      #   sync: false
+
+
