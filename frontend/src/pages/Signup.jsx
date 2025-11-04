@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import supabase from '../config/supabase';
+import { FaCheck, FaTimes } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
 export default function Signup() {
@@ -9,6 +11,8 @@ export default function Signup() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [referralCode, setReferralCode] = useState('');
+  const [referralValid, setReferralValid] = useState(null);
+  const [checkingReferral, setCheckingReferral] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -18,8 +22,43 @@ export default function Signup() {
     const refFromUrl = searchParams.get('ref');
     if (refFromUrl) {
       setReferralCode(refFromUrl);
+      validateReferralCode(refFromUrl);
     }
   }, [searchParams]);
+
+  const validateReferralCode = async (code) => {
+    if (!code || code.trim() === '') {
+      setReferralValid(null);
+      return;
+    }
+
+    setCheckingReferral(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('referral_code')
+        .eq('referral_code', code.trim())
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        setReferralValid(false);
+      } else if (data) {
+        setReferralValid(true);
+      } else {
+        setReferralValid(false);
+      }
+    } catch (error) {
+      setReferralValid(false);
+    } finally {
+      setCheckingReferral(false);
+    }
+  };
+
+  useEffect(() => {
+    if (referralCode && referralCode !== searchParams.get('ref')) {
+      validateReferralCode(referralCode);
+    }
+  }, [referralCode]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -123,7 +162,7 @@ export default function Signup() {
               <label htmlFor="referralCode" className="block text-sm font-medium leading-6 text-gray-900">
                 Referral Code <span className="text-gray-500 font-normal">(Optional)</span>
               </label>
-              <div className="mt-2">
+              <div className="mt-2 relative">
                 <input
                   id="referralCode"
                   name="referralCode"
@@ -131,12 +170,37 @@ export default function Signup() {
                   value={referralCode}
                   onChange={(e) => setReferralCode(e.target.value)}
                   placeholder="Enter referral code to earn bonus coins"
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-3"
+                  className={`block w-full rounded-md border-0 py-1.5 pr-10 text-gray-900 shadow-sm ring-1 ring-inset ${
+                    referralValid === true
+                      ? 'ring-green-500 focus:ring-green-500'
+                      : referralValid === false
+                      ? 'ring-red-500 focus:ring-red-500'
+                      : 'ring-gray-300 focus:ring-indigo-600'
+                  } placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 px-3`}
                 />
+                {referralCode && !checkingReferral && (
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    {referralValid === true ? (
+                      <FaCheck className="w-5 h-5 text-green-500" />
+                    ) : referralValid === false ? (
+                      <FaTimes className="w-5 h-5 text-red-500" />
+                    ) : null}
+                  </div>
+                )}
+                {checkingReferral && (
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <div className="w-4 h-4 border-2 border-gray-300 border-t-indigo-600 rounded-full animate-spin"></div>
+                  </div>
+                )}
               </div>
-              {referralCode && (
-                <p className="mt-1 text-xs text-gray-500">
-                  💰 You'll both get 200 coins when you post your first item!
+              {referralCode && referralValid === true && (
+                <p className="mt-1 text-xs text-green-600">
+                  ✓ Valid referral code! You'll both get 200 coins when you post your first item!
+                </p>
+              )}
+              {referralCode && referralValid === false && (
+                <p className="mt-1 text-xs text-red-600">
+                  ✗ Invalid referral code. Please check and try again.
                 </p>
               )}
             </div>

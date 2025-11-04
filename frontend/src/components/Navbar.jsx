@@ -9,6 +9,7 @@ const navigation = [
   { name: 'Marketplace', href: '/marketplace', current: false },
   { name: 'My Items', href: '/my-items', current: false },
   { name: 'Trades', href: '/trades', current: false },
+  { name: 'About', href: '/about', current: false },
 ]
 
 function classNames(...classes) {
@@ -48,7 +49,7 @@ export default function Navbar() {
               </div>
               <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
                 <div className="flex flex-shrink-0 items-center">
-                  <Link to="/" className="text-white text-xl font-bold tracking-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.35)]">Barter</Link>
+                  <Link to="/" className="text-white text-xl font-bold tracking-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.35)]">TradeHub</Link>
                 </div>
                 <div className="hidden sm:ml-6 sm:block">
                   <div className="flex space-x-4">
@@ -76,8 +77,8 @@ export default function Navbar() {
                       <Menu.Button className="relative flex rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
                         <span className="absolute -inset-1.5" />
                         <span className="sr-only">Open user menu</span>
-                        <div className="h-8 w-8 rounded-full bg-white/20 ring-1 ring-white/30 flex items-center justify-center text-white">
-                          {currentUser.displayName?.charAt(0) || currentUser.email?.charAt(0)}
+                        <div className="h-8 w-8 rounded-full bg-white/20 ring-1 ring-white/30 flex items-center justify-center text-white font-semibold">
+                          {(currentUser.user_metadata?.display_name?.charAt(0) || currentUser.email?.charAt(0) || 'U').toUpperCase()}
                         </div>
                       </Menu.Button>
                     </div>
@@ -90,7 +91,7 @@ export default function Navbar() {
                       leaveFrom="transform opacity-100 scale-100"
                       leaveTo="transform opacity-0 scale-95"
                     >
-                      <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      <Menu.Items className="absolute right-0 z-[9999] mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                         <Menu.Item>
                           {({ active }) => (
                             <Link

@@ -242,14 +242,25 @@ const ChatWindow = ({ otherUserId, onClose }) => {
     let isMounted = true;
 
     const initializeChat = async () => {
-      const [userData, chatData] = await Promise.all([
-        supabase
-          .from('users')
-          .select('display_name, email')
-          .eq('id', otherUserId)
-          .single(),
-        supabase.rpc('get_or_create_chat', { other_user_id: otherUserId }),
-      ]);
+      let userData = { data: { display_name: null, email: 'Loading...' } };
+      try {
+        const { data: userInfo } = await supabase.rpc('get_user_display_info', { p_user_id: otherUserId });
+        if (userInfo) {
+          userData = { data: userInfo };
+        }
+      } catch (err) {
+        try {
+          userData = await supabase
+            .from('users')
+            .select('display_name, email')
+            .eq('id', otherUserId)
+            .single();
+        } catch {
+          userData = { data: { display_name: null, email: 'User' } };
+        }
+      }
+
+      const chatData = await supabase.rpc('get_or_create_chat', { other_user_id: otherUserId });
 
       if (userData.data && isMounted) {
         setOtherUser(userData.data);

@@ -18,6 +18,7 @@ import MyItems from './pages/MyItems';
 import Trades from './pages/Trades';
 import Profile from './pages/Profile';
 import ReferralPage from './pages/ReferralPage';
+import About from './pages/About';
 
 function PrivateRoute({ children }) {
   const { currentUser } = useAuth();
@@ -84,6 +85,7 @@ function App() {
                   </PrivateRoute>
                 }
               />
+              <Route path="/about" element={<About />} />
             </Routes>
             </PageTransition>
           </main>

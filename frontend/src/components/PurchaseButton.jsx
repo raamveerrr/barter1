@@ -86,11 +86,11 @@ const TransactionSuccessSplash = ({ amount, onClose }) => {
           animate={{ scale: 1 }}
           transition={{ duration: 0.4, delay: 0.2, type: 'spring', stiffness: 200 }}
         >
-          <FaCheckCircle className="text-7xl sm:text-8xl text-green-400 drop-shadow-[0_0_30px_rgba(74,222,128,0.5)]" />
+          <FaCheckCircle className="text-5xl sm:text-6xl text-green-400 drop-shadow-[0_0_20px_rgba(74,222,128,0.5)]" />
         </motion.div>
         
         <motion.h2
-          className="mt-6 text-3xl sm:text-4xl font-extrabold text-white"
+          className="mt-4 text-2xl sm:text-3xl font-extrabold text-white"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.4 }}
@@ -99,7 +99,7 @@ const TransactionSuccessSplash = ({ amount, onClose }) => {
         </motion.h2>
         
         <motion.div
-          className="mt-4 flex items-center gap-2 text-xl sm:text-2xl font-semibold text-indigo-400"
+          className="mt-3 flex items-center gap-2 text-lg sm:text-xl font-semibold text-indigo-400"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.6 }}

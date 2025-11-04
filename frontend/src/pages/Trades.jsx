@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import supabase from '../config/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { FaCoins, FaCheckCircle, FaArrowRight, FaUser, FaStore } from 'react-icons/fa';
+import { FaCoins, FaCheckCircle, FaArrowRight, FaUser, FaStore, FaStar } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 
 export default function Trades() {
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [ratings, setRatings] = useState({});
+  const [showRating, setShowRating] = useState({});
   const { currentUser } = useAuth();
 
   useEffect(() => {
@@ -30,7 +33,29 @@ export default function Trades() {
       }
     };
 
+    const loadRatings = async () => {
+      try {
+        const { data } = await supabase
+          .from('ratings')
+          .select('transaction_id, rating')
+          .eq('rater_id', currentUser.id);
+        
+        if (data) {
+          const ratingMap = {};
+          data.forEach((r) => {
+            if (r.transaction_id) {
+              ratingMap[r.transaction_id] = r.rating;
+            }
+          });
+          setRatings(ratingMap);
+        }
+      } catch (error) {
+        console.error('Error loading ratings:', error);
+      }
+    };
+
     loadTrades();
+    loadRatings();
 
     const channel = supabase
       .channel('trades-updates')
@@ -85,6 +110,31 @@ export default function Trades() {
       cancelled: 'bg-gradient-to-r from-red-500/20 to-rose-500/20 text-red-400 ring-1 ring-red-500/30',
     };
     return styles[status] || styles.completed;
+  };
+
+  const handleRate = async (tradeId, otherUserId, rating) => {
+    try {
+      const { error } = await supabase
+        .from('ratings')
+        .upsert(
+          {
+            rater_id: currentUser.id,
+            rated_user_id: otherUserId,
+            transaction_id: tradeId,
+            rating,
+          },
+          { onConflict: 'rater_id,rated_user_id,transaction_id' }
+        );
+
+      if (error) throw error;
+
+      setRatings((prev) => ({ ...prev, [tradeId]: rating }));
+      setShowRating((prev) => ({ ...prev, [tradeId]: false }));
+      toast.success('Rating submitted!');
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      toast.error('Failed to submit rating');
+    }
   };
 
   if (loading) {
@@ -211,6 +261,51 @@ export default function Trades() {
                     <div className="flex items-center gap-2 text-sm text-gray-400 bg-gray-900/30 rounded-lg p-3">
                       <FaArrowRight className="w-4 h-4 text-indigo-400" />
                       <span>You purchased this item for {trade.price} coins</span>
+                    </div>
+                  )}
+
+                  {trade.status === 'completed' && (
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      {ratings[trade.id] ? (
+                        <div className="flex items-center gap-2 text-sm text-gray-300">
+                          <span>Your rating:</span>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <FaStar
+                                key={star}
+                                className={`w-4 h-4 ${
+                                  star <= ratings[trade.id]
+                                    ? 'text-yellow-400 fill-yellow-400'
+                                    : 'text-gray-600'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : showRating[trade.id] ? (
+                        <div className="space-y-2">
+                          <span className="text-sm text-gray-300">Rate this transaction:</span>
+                          <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                onClick={() => handleRate(trade.id, isBuyer ? trade.seller_id : trade.buyer_id, star)}
+                                className="p-1 hover:scale-110 transition-transform"
+                              >
+                                <FaStar className="w-5 h-5 text-yellow-400 hover:fill-yellow-400" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowRating((prev) => ({ ...prev, [trade.id]: true }))}
+                          className="text-sm text-indigo-400 hover:text-indigo-300 flex items-center gap-2"
+                        >
+                          <FaStar className="w-4 h-4" />
+                          Rate this transaction
+                        </button>
+                      )}
                     </div>
                   )}
                 </motion.div>

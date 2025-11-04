@@ -1,6 +1,5 @@
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
-import RewardTracker from '../components/RewardTracker';
 
 export default function Home() {
   const { currentUser } = useAuth();
@@ -43,11 +42,8 @@ export default function Home() {
       </div>
 
       {currentUser && (
-        <div className="mt-16 max-w-4xl mx-auto px-4">
-          <RewardTracker />
-          
-          <div className="mt-12">
-            <h2 className="text-2xl font-bold mb-6 text-center text-white">Quick Actions</h2>
+        <div className="mt-16">
+          <h2 className="text-2xl font-bold mb-6 text-center text-white">Quick Actions</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Link
               to="/my-items"
@@ -76,7 +72,6 @@ export default function Home() {
                 View your profile and coin balance
               </p>
             </Link>
-          </div>
           </div>
         </div>
       )}

@@ -31,11 +31,23 @@ const MessagesList = ({ onClose }) => {
           (chatsData || []).map(async (chat) => {
             const otherUserId = chat.user1_id === currentUser.id ? chat.user2_id : chat.user1_id;
             
-            const { data: userData } = await supabase
-              .from('users')
-              .select('display_name, email')
-              .eq('id', otherUserId)
-              .single();
+            let userData = { data: { display_name: null, email: 'User' } };
+            try {
+              const { data: userInfo } = await supabase.rpc('get_user_display_info', { p_user_id: otherUserId });
+              if (userInfo) {
+                userData = { data: userInfo };
+              }
+            } catch (err) {
+              try {
+                userData = await supabase
+                  .from('users')
+                  .select('display_name, email')
+                  .eq('id', otherUserId)
+                  .single();
+              } catch {
+                userData = { data: { display_name: null, email: 'User' } };
+              }
+            }
 
             const { count: unreadCount } = await supabase
               .from('messages')
